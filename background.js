@@ -21,9 +21,16 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     return
   }
 
-  const jsonBlob = await fetch(request.dataURL).then(r => r.blob())
-  const requestData = JSON.parse(await jsonBlob.text())
-  const fetchFileErr = requestData.fetchFileErr
+  let requestData, fetchFileErr;
+  const msgJSON = request.msgJSON || '';
+  if (msgJSON == '') {
+    const jsonBlob = await fetch(request.dataURL).then(r => r.blob())
+    requestData = JSON.parse(await jsonBlob.text())
+    fetchFileErr = requestData.fetchFileErr
+  } else {
+    requestData = msgJSON;
+  }
+  
   const dom = requestData.dom
   const files = requestData.files
   const formData = new FormData()
