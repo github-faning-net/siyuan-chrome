@@ -120,6 +120,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
           'notebook': requestData.notebook,
           'path': title,
           'markdown': markdown,
+          'withMath': response.data.withMath
         }),
       }).then((response) => {
         return response.json()
