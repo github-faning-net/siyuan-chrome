@@ -103,11 +103,25 @@ const siyuanSendUpload = async (tempElement, tabId, srcUrl, type, article, href)
   srcList = [...new Set(srcList)]
   let fetchFileErr = false;
   for (let i = 0; i < srcList.length; i++) {
-    const src = srcList[i]
+    let src = srcList[i]
     const msgSrc = src.length > 64 ? src.substring(0, 64) + '...' : src
     siyuanShowTip('Clipping images [' + msgSrc + '], please wait a moment...')
     let response;
     try {
+      // Wikipedia 使用图片原图 https://github.com/siyuan-note/siyuan/issues/11640
+      if (-1 !== src.indexOf('wikipedia/commons/thumb/')) {
+        let idx = src.lastIndexOf('.')
+        let ext = src.substring(idx)
+        if (0 < src.indexOf('.svg.png')) {
+          ext = '.svg'
+        }
+        idx = src.indexOf(ext + '/')
+        if (0 < idx) {
+          src = src.substring(0, idx + ext.length)
+          src = src.replace('/commons/thumb/', '/commons/')
+        }
+      }
+
       response = await fetch(src)
     } catch (e) {
       console.warn("fetch [" + src + "] failed", e)
