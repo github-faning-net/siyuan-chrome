@@ -2,7 +2,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const ipElement = document.getElementById('ip')
     const tokenElement = document.getElementById('token')
     const showTipElement = document.getElementById('showTip')
-    const notebooksElement = document.getElementById('notebooks')
+    const searchDocElement = document.getElementById('searchDoc')
+    const parentDocElement = document.getElementById('parentDoc')
+    const tagsElement = document.getElementById('tags')
+    const assetsElement = document.getElementById('assets')
+    const expElement = document.getElementById('exp')
+    const expGroupElement = document.getElementById('expGroup')
+    const expSpanElement = document.getElementById('expSpan')
+    const expBoldElement = document.getElementById('expBold')
+    const expItalicElement = document.getElementById('expItalic')
+
     ipElement.addEventListener('change', () => {
         let ip = ipElement.value;
         // 去掉结尾的斜杆 https://github.com/siyuan-note/siyuan/issues/11478
@@ -23,19 +32,64 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.sync.set({
             token: tokenElement.value,
         })
-        getNotebooks(ipElement, tokenElement, notebooksElement)
+        updateSearch()
     })
     showTipElement.addEventListener('change', () => {
         chrome.storage.sync.set({
             showTip: showTipElement.checked,
         })
     })
-    notebooksElement.addEventListener('change', () => {
-        notebooksElement.setAttribute("data-id", notebooksElement.value)
+    searchDocElement.addEventListener('change', () => {
         chrome.storage.sync.set({
-            notebook: notebooksElement.value,
+            searchKey: searchDocElement.value,
+        })
+        updateSearch()
+    })
+    parentDocElement.addEventListener('change', () => {
+        const selectElement = document.getElementById('parentDoc');
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const notebook = selectedOption.getAttribute('data-notebook');
+        const parentDoc = selectedOption.getAttribute('data-parent');
+
+        chrome.storage.sync.set({
+            notebook: notebook,
+            parentDoc: parentDoc,
+            parentHPath: selectedOption.innerText,
         })
     })
+    tagsElement.addEventListener('change', () => {
+        tagsElement.value = tagsElement.value.replace(/#/g, '')
+        chrome.storage.sync.set({
+            tags: tagsElement.value,
+        })
+    })
+    assetsElement.addEventListener('change', () => {
+        chrome.storage.sync.set({
+            assets: assetsElement.checked,
+        })
+    })
+    expSpanElement.addEventListener('change', () => {
+        chrome.storage.sync.set({
+            expSpan: expSpanElement.checked,
+        })
+    })
+    expBoldElement.addEventListener('change', () => {
+        chrome.storage.sync.set({
+            expBold: expBoldElement.checked,
+        })
+    })
+    expItalicElement.addEventListener('change', () => {
+        chrome.storage.sync.set({
+            expItalic: expItalicElement.checked,
+        })
+    })
+    expElement.addEventListener('change', function () {
+        if (expElement.checked) {
+            expGroupElement.style.display = 'block';
+        } else {
+            expGroupElement.style.display = 'none';
+        }
+    });
 
     const eyeElement = document.querySelector('.b3-icon')
     eyeElement.addEventListener('click', () => {
@@ -65,24 +119,48 @@ document.addEventListener('DOMContentLoaded', () => {
         ip: 'http://127.0.0.1:6806',
         showTip: true,
         token: '',
+        searchKey: '',
         notebook: '',
+        parentDoc: '',
+        parentHPath: '',
+        tags: '',
+        assets: true,
+        expSpan: true,
+        expBold: false,
+        expItalic: false,
     }, function (items) {
         ipElement.value = items.ip || 'http://127.0.0.1:6806'
         tokenElement.value = items.token || ''
         showTipElement.checked = items.showTip
-        notebooksElement.setAttribute("data-id", items.notebook)
-        getNotebooks(ipElement, tokenElement, notebooksElement)
+        searchDocElement.value = items.searchKey || ''
+        parentDocElement.setAttribute("data-notebook", items.notebook)
+        parentDocElement.setAttribute("data-parent", items.parentDoc)
+        parentDocElement.setAttribute("data-parenthpath", items.parentHPath)
+        tagsElement.value = items.tags || ''
+        assetsElement.checked = items.assets
+        expSpanElement.checked = items.expSpan
+        expBoldElement.checked = items.expBold
+        expItalicElement.checked = items.expItalic
+        updateSearch()
     })
 })
 
-const getNotebooks = (ipElement, tokenElement, notebooksElement) => {
-    fetch(ipElement.value + '/api/notebook/lsNotebooks', {
+const updateSearch = () => {
+    const ipElement = document.getElementById('ip')
+    const tokenElement = document.getElementById('token')
+    const searchDocElement = document.getElementById('searchDoc')
+    const parentDocElement = document.getElementById('parentDoc')
+
+    fetch(ipElement.value + '/api/filetree/searchDocs', {
         method: 'POST',
         redirect: "manual",
         headers: {
             'Authorization': 'Token ' + tokenElement.value,
         },
-        body: JSON.stringify({"flashcard": false})
+        body: JSON.stringify({
+            "k": searchDocElement.value,
+            "flashcard": false
+        })
     }).then((response) => {
         if (response.status !== 200) {
             document.getElementById('log').innerHTML = "Authentication failed"
@@ -91,32 +169,39 @@ const getNotebooks = (ipElement, tokenElement, notebooksElement) => {
         }
         return response.json()
     }).then((response) => {
-        if (response.code === 0) {
-            if (!response.data.notebooks) {
-                document.getElementById('log').innerHTML = "Please upgrade SiYuan to v1.3.5 or above"
-                return
+        if (0 !== response.code) {
+            document.getElementById('log').innerHTML = "Search docs failed"
+            return
+        }
+
+        let optionsHTML = ''
+        response.data.forEach(doc => {
+            const parentDoc = doc.path.substring(doc.path.toString().lastIndexOf('/') + 1).replace(".sy", '')
+            let selected = ""
+            if (parentDocElement.dataset.notebook === doc.box && parentDocElement.dataset.parent === parentDoc &&
+                parentDocElement.dataset.parenthpath === doc.hPath) {
+                selected = "selected";
             }
+            optionsHTML += `<option ${selected} data-notebook="${doc.box}" data-parent="${parentDoc}">${escapeHtml(doc.hPath)}</option>`
+        })
+        parentDocElement.innerHTML = optionsHTML
 
-            if (response.data.notebooks.length > 0) {
-                let optionsHTML = ''
-                response.data.notebooks.forEach(notebook => {
-                    if (notebook.closed) {
-                        return
-                    }
-
-                    optionsHTML += `<option value="${notebook.id}">${escapeHtml(notebook.name)}</option>`
-                })
-                notebooksElement.innerHTML = optionsHTML
-                notebooksElement.value = notebooksElement.getAttribute("data-id")
-
+        if (parentDocElement.selectedOptions && parentDocElement.selectedOptions.length > 0) {
+            let selected = parentDocElement.querySelector('option[selected]')
+            if (!selected) {
+                selected = parentDocElement.selectedOptions[0]
                 chrome.storage.sync.set({
-                    notebook: notebooksElement.value,
+                    notebook: selected.getAttribute("data-notebook"),
+                    parentDoc: selected.getAttribute("data-parent"),
+                    parentHPath: selected.innerText,
                 })
-            } else {
-                document.getElementById('log').innerHTML = "Please create a notebook before"
             }
         } else {
-            document.getElementById('log').innerHTML = "Get notebooks failed"
+            chrome.storage.sync.set({
+                notebook: '',
+                parentDoc: '',
+                parentHPath: ''
+            })
         }
     })
 }
@@ -130,7 +215,7 @@ const escapeHtml = (unsafe) => {
         .replace(/'/g, "&#039;");
 }
 
-const siyuanGetReadability = (tabId) => {
+const siyuanGetReadability = async (tabId) => {
     try {
         siyuanShowTip('Clipping, please wait a moment...', 60 * 1000)
     } catch (e) {
@@ -139,27 +224,28 @@ const siyuanGetReadability = (tabId) => {
         return
     }
 
-    window.scrollTo(0, document.body.scrollHeight);
-    scrollTo1(() => {
-        toggle = false
-        clearInterval(scrollTimer)
-        window.scrollTo(0, 0);
-        try {
-            // 浏览器剪藏扩展剪藏某些网页代码块丢失注释 https://github.com/siyuan-note/siyuan/issues/5676
-            document.querySelectorAll(".hljs-comment").forEach(item => {
-                item.classList.remove("hljs-comment")
-                item.classList.add("hljs-cmt")
-            })
+    try {
+        // 浏览器剪藏扩展剪藏某些网页代码块丢失注释 https://github.com/siyuan-note/siyuan/issues/5676
+        document.querySelectorAll(".hljs-comment").forEach(item => {
+            item.classList.remove("hljs-comment")
+            item.classList.add("hljs-cmt")
+        })
 
-            const article = new Readability(document.cloneNode(true), {keepClasses: true, charThreshold: 16, debug: true }).parse()
-            const tempElement = document.createElement('div')
-            tempElement.innerHTML = article.content
-            // console.log(article)
-            siyuanSendUpload(tempElement, tabId, undefined, "article", article, window.location.href)
-            siyuanClearTip()
-        } catch (e) {
-            console.error(e)
-            siyuanShowTip(e.message, 7 * 1000)
-        }
-    })
+        // 重构并合并Readability前处理 https://github.com/siyuan-note/siyuan/issues/13306
+        const clonedDoc = await siyuanGetCloneNode(document);
+
+        const article = new Readability(clonedDoc, {
+            keepClasses: true,
+            charThreshold: 16,
+            debug: true
+        }).parse()
+        const tempElement = document.createElement('div')
+        tempElement.innerHTML = article.content
+        // console.log(article)
+        siyuanSendUpload(tempElement, tabId, undefined, "article", article, window.location.href)
+        siyuanClearTip()
+    } catch (e) {
+        console.error(e)
+        siyuanShowTip(e.message, 7 * 1000)
+    }
 }

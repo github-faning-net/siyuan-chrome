@@ -42,10 +42,10 @@
   },
   "name": "SiYuan",
   "description": "Web clipping for SiYuan. 思源笔记网页剪藏。",
-  "version": "1.1.16",
+  "version": "1.7.1",
   "browser_specific_settings": {
     "gecko": {
-      "id": "addon@siyuan.com"
+      "id": "addons@siyuan.com"
     }
   }
   
